@@ -1,0 +1,1757 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Alt Momentum Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #05070b;
+      --surface: rgba(10, 15, 24, 0.9);
+      --surface-2: rgba(16, 22, 34, 0.98);
+      --surface-3: #161d2d;
+      --border: rgba(148, 163, 184, 0.15);
+      --border-2: rgba(148, 163, 184, 0.26);
+      --text: #edf4ff;
+      --muted: #97a6c1;
+      --muted-2: #66758f;
+      --green: #00e676;
+      --red: #ff617a;
+      --yellow: #ffb84d;
+      --blue: #71b7ff;
+      --teal: #39ddc3;
+      --orange: #ff9d42;
+      --purple: #ab92ff;
+      --shadow: 0 28px 80px rgba(0, 0, 0, 0.45);
+      --font-sans: "Space Grotesk", sans-serif;
+      --font-mono: "IBM Plex Mono", monospace;
+    }
+    body {
+      min-height: 100vh;
+      font-family: var(--font-sans);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(57,221,195,0.12), transparent 28%),
+        radial-gradient(circle at top right, rgba(255,157,66,0.18), transparent 24%),
+        linear-gradient(180deg, #03050a, #07101a 42%, #04060a 100%);
+    }
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255,255,255,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,0.02) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: radial-gradient(circle at center, black, transparent 78%);
+    }
+    .app {
+      width: min(1400px, calc(100% - 24px));
+      margin: 12px auto;
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      overflow: hidden;
+      position: relative;
+      background: linear-gradient(180deg, rgba(9, 13, 21, 0.96), rgba(7, 10, 16, 0.98));
+      box-shadow: var(--shadow);
+    }
+    .hero {
+      padding: 28px;
+      display: grid;
+      gap: 20px;
+      grid-template-columns: 1.35fr .95fr;
+      border-bottom: 1px solid var(--border);
+      background:
+        linear-gradient(135deg, rgba(255,157,66,0.07), transparent 34%),
+        linear-gradient(225deg, rgba(57,221,195,0.08), transparent 28%);
+    }
+    .eyebrow, .mono, .chip, .button, th, .pill, .metric-k, .mini-label, .count {
+      font-family: var(--font-mono);
+      text-transform: uppercase;
+      letter-spacing: .08em;
+    }
+    .eyebrow, .metric-k, .mini-label { color: var(--muted-2); font-size: 11px; }
+    h1 {
+      font-size: clamp(2rem, 4vw, 3.6rem);
+      line-height: .98;
+      letter-spacing: -.05em;
+      margin: 10px 0 14px;
+    }
+    .hero p { color: var(--muted); line-height: 1.65; max-width: 64ch; }
+    .hero-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      align-self: start;
+    }
+    .glass, .controls, .stats, .banner, .table-shell, .legend, .pager {
+      border: 1px solid var(--border);
+      background: var(--surface);
+      border-radius: 22px;
+      backdrop-filter: blur(14px);
+    }
+    .mini-card {
+      padding: 16px;
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 18px;
+      background: rgba(255,255,255,0.02);
+    }
+    .mini-v { font-size: 1.7rem; font-weight: 700; margin-top: 7px; }
+    .mini-p { color: var(--muted); font-size: 12px; margin-top: 6px; line-height: 1.5; }
+    .topbar {
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .pulse {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--teal);
+      box-shadow: 0 0 14px var(--teal);
+      animation: pulse 1.8s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%,100% { transform: scale(1); opacity: 1; }
+      50% { transform: scale(.72); opacity: .45; }
+    }
+    .brand-name { font-weight: 600; font-size: 14px; }
+    .brand-sub { color: var(--muted-2); font-size: 11px; }
+    .toolbar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chip, .button {
+      border: 1px solid var(--border-2);
+      border-radius: 999px;
+      background: rgba(16, 22, 34, 0.9);
+      color: var(--text);
+      font-size: 11px;
+      padding: 9px 14px;
+    }
+    .button { cursor: pointer; transition: .18s ease; }
+    .button:hover { color: var(--teal); border-color: rgba(57,221,195,0.45); }
+    .content { padding: 22px; display: grid; gap: 18px; }
+    .legend { padding: 14px 18px; display: flex; gap: 16px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+    .dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .banner { overflow: hidden; }
+    .banner-grid { display: grid; grid-template-columns: auto 1fr; }
+    .banner-tag {
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 18px 12px;
+      border-right: 1px solid var(--border);
+      background: rgba(255,157,66,0.08);
+      color: var(--orange);
+      font-family: var(--font-mono);
+      letter-spacing: .18em;
+      font-size: 11px;
+    }
+    .banner-body {
+      padding: 22px;
+      display: grid;
+      gap: 18px;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+    }
+    .lead-symbol { font-family: var(--font-mono); font-size: clamp(2rem, 4vw, 2.9rem); font-weight: 600; }
+    .lead-pair { color: var(--muted-2); font-size: 11px; margin-top: 4px; }
+    .banner-metrics { display: grid; gap: 10px; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .metric {
+      padding: 12px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .metric-v { margin-top: 6px; font-family: var(--font-mono); font-size: 15px; }
+    .lead-why { color: var(--muted); line-height: 1.7; font-size: 13px; margin-top: 14px; }
+    .ring { width: 88px; height: 88px; position: relative; }
+    .ring svg { width: 88px; height: 88px; transform: rotate(-90deg); }
+    .ring circle { fill: none; stroke-width: 6; }
+    .ring-bg { stroke: rgba(255,255,255,0.08); }
+    .ring-fg { stroke-linecap: round; transition: stroke-dashoffset .8s ease, stroke .25s ease; }
+    .ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 18px;
+      font-weight: 600;
+    }
+    .stats {
+      padding: 10px;
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(6, minmax(0, 1fr));
+    }
+    .stat {
+      padding: 16px;
+      border-radius: 18px;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .stat-v { font-family: var(--font-mono); font-size: 24px; margin-top: 6px; font-weight: 600; }
+    .sector-board {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .sector-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .sector-head p {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 72ch;
+    }
+    .sector-grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+    .sector-card {
+      padding: 14px;
+      border-radius: 18px;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,0.05);
+      display: grid;
+      gap: 10px;
+    }
+    .sector-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      align-items: center;
+    }
+    .sector-name {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+    }
+    .sector-count {
+      color: var(--muted-2);
+      font-family: var(--font-mono);
+      font-size: 10px;
+    }
+    .sector-heat {
+      height: 8px;
+      border-radius: 999px;
+      overflow: hidden;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .sector-heat-fill {
+      height: 100%;
+      border-radius: 999px;
+      background: linear-gradient(90deg, rgba(255,157,66,0.45), rgba(57,221,195,0.95));
+    }
+    .sector-metrics {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .sector-metric {
+      padding: 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.02);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .sector-metric .metric-v {
+      font-size: 13px;
+      margin-top: 4px;
+    }
+    .sector-leaders {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .leader-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      color: var(--text);
+    }
+    .leader-chip strong {
+      font-weight: 600;
+      color: var(--teal);
+    }
+    .controls {
+      padding: 14px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .seg {
+      display: flex;
+      gap: 4px;
+      padding: 4px;
+      border-radius: 999px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      flex-wrap: wrap;
+    }
+    .seg button {
+      border: none;
+      cursor: pointer;
+      background: transparent;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      padding: 9px 12px;
+      border-radius: 999px;
+    }
+    .seg button.active {
+      color: var(--text);
+      background: linear-gradient(135deg, rgba(255,157,66,0.18), rgba(57,221,195,0.16));
+    }
+    .search {
+      position: relative;
+      margin-left: auto;
+      flex: 1 1 220px;
+      max-width: 280px;
+    }
+    .search input {
+      width: 100%;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text);
+      padding: 12px 16px 12px 38px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      outline: none;
+    }
+    .search-icon {
+      position: absolute;
+      left: 13px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--muted-2);
+    }
+    .count { color: var(--muted); font-size: 11px; }
+    .table-shell { overflow: hidden; }
+    .table-scroll { overflow-x: auto; }
+    table { width: 100%; min-width: 1180px; border-collapse: collapse; }
+    th, td { padding: 14px 16px; text-align: left; border-bottom: 1px solid rgba(255,255,255,0.05); }
+    th {
+      color: var(--muted-2);
+      font-size: 10px;
+      cursor: pointer;
+      background: rgba(255,255,255,0.015);
+    }
+    td { font-family: var(--font-mono); font-size: 12px; }
+    tbody tr:hover { background: rgba(255,255,255,0.02); }
+    .symbol-cell { font-size: 13px; font-weight: 600; }
+    .sub { color: var(--muted-2); font-size: 10px; font-weight: 400; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .neu { color: var(--muted); }
+    .score-wrap, .corr-wrap, .rsi-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .bar, .small-bar {
+      background: var(--surface-3);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .bar { width: 78px; height: 6px; }
+    .small-bar { width: 54px; height: 6px; }
+    .fill { height: 100%; border-radius: 999px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      border-radius: 999px;
+      font-size: 10px;
+      font-weight: 500;
+    }
+    .ph-pre, .tag-pre { color: var(--orange); background: rgba(255,157,66,0.1); border: 1px solid rgba(255,157,66,0.18); }
+    .ph-break, .tag-break { color: var(--teal); background: rgba(57,221,195,0.1); border: 1px solid rgba(57,221,195,0.18); }
+    .ph-exhaust, .tag-exhaust { color: var(--red); background: rgba(255,97,122,0.1); border: 1px solid rgba(255,97,122,0.18); }
+    .ph-neutral, .tag-neutral { color: var(--muted); background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); }
+    .ph-accum, .tag-accum { color: var(--purple); background: rgba(171,146,255,0.12); border: 1px solid rgba(171,146,255,0.22); box-shadow: 0 0 18px rgba(171,146,255,0.12); }
+    .structure-rocket { color: var(--purple); background: rgba(171,146,255,0.14); border: 1px solid rgba(171,146,255,0.22); box-shadow: 0 0 18px rgba(171,146,255,0.14); }
+    .structure-above { color: var(--teal); background: rgba(57,221,195,0.1); border: 1px solid rgba(57,221,195,0.18); }
+    .structure-at { color: var(--yellow); background: rgba(255,184,77,0.1); border: 1px solid rgba(255,184,77,0.18); }
+    .structure-below { color: var(--red); background: rgba(255,97,122,0.1); border: 1px solid rgba(255,97,122,0.18); }
+    .sector-chip { color: var(--blue); background: rgba(113,183,255,0.1); border: 1px solid rgba(113,183,255,0.18); }
+    .sympathy-badge {
+      color: var(--orange);
+      background: rgba(255,157,66,0.12);
+      border: 1px solid rgba(255,157,66,0.2);
+      animation: sympathyPulse 1.4s ease-in-out infinite;
+    }
+    @keyframes sympathyPulse {
+      0%,100% { opacity: 1; box-shadow: 0 0 0 rgba(255,157,66,0); }
+      50% { opacity: 0.72; box-shadow: 0 0 12px rgba(255,157,66,0.16); }
+    }
+    .corr-free { color: var(--orange); background: rgba(255,157,66,0.1); border: 1px solid rgba(255,157,66,0.18); }
+    .corr-low { color: var(--teal); background: rgba(57,221,195,0.1); border: 1px solid rgba(57,221,195,0.18); }
+    .corr-mid { color: var(--yellow); background: rgba(255,184,77,0.1); border: 1px solid rgba(255,184,77,0.18); }
+    .corr-high { color: var(--red); background: rgba(255,97,122,0.1); border: 1px solid rgba(255,97,122,0.18); }
+    .loading-row {
+      text-align: center;
+      color: var(--muted);
+      padding: 32px;
+      font-family: var(--font-mono);
+    }
+    .mobile-list { display: none; gap: 12px; padding: 14px; }
+    .coin-card {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+      border-radius: 18px;
+      border: 1px solid rgba(255,255,255,0.05);
+      background: var(--surface-2);
+    }
+    .coin-row, .coin-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .coin-symbol { font-family: var(--font-mono); font-size: 16px; font-weight: 600; }
+    .coin-sub { color: var(--muted-2); font-family: var(--font-mono); font-size: 10px; margin-top: 2px; }
+    .coin-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .coin-metric {
+      padding: 10px;
+      border-radius: 14px;
+      background: rgba(255,255,255,0.025);
+      border: 1px solid rgba(255,255,255,0.04);
+    }
+    .pager {
+      padding: 14px 16px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 10px;
+    }
+    .pager button {
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: var(--surface-2);
+      color: var(--text);
+      cursor: pointer;
+      padding: 10px 14px;
+      font-family: var(--font-mono);
+      font-size: 11px;
+    }
+    .pager button:disabled { opacity: .35; cursor: not-allowed; }
+    @media (max-width: 1100px) {
+      .hero, .banner-body { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .banner-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+      .sector-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 720px) {
+      body { font-size: 13px; }
+      .app { width: min(100% - 12px, 100%); margin: 6px auto; border-radius: 20px; }
+      .hero, .content, .topbar { padding: 16px; }
+      .hero { grid-template-columns: 1fr; gap: 14px; }
+      .hero-grid, .stats, .banner-metrics, .coin-grid { grid-template-columns: 1fr; }
+      .sector-grid, .sector-metrics { grid-template-columns: 1fr; }
+      h1 { font-size: 2rem; line-height: 1.03; }
+      .toolbar > * { width: 100%; text-align: center; justify-content: center; }
+      .topbar, .controls { align-items: stretch; }
+      .brand { align-items: flex-start; }
+      .banner-grid { grid-template-columns: 1fr; }
+      .banner-tag {
+        writing-mode: horizontal-tb;
+        transform: none;
+        border-right: none;
+        border-bottom: 1px solid var(--border);
+        text-align: center;
+      }
+      .banner-body { padding: 18px; }
+      .ring { margin: 0 auto; }
+      .controls { gap: 10px; }
+      .seg {
+        width: calc(100% + 2px);
+        margin-inline: -1px;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        scrollbar-width: none;
+      }
+      .seg::-webkit-scrollbar { display: none; }
+      .seg button { white-space: nowrap; flex: 0 0 auto; }
+      .search { width: 100%; max-width: none; margin-left: 0; }
+      .count { width: 100%; text-align: center; }
+      .table-scroll { display: none; }
+      .mobile-list { display: grid; }
+      .pager { justify-content: space-between; padding: 14px; }
+      .pager button { flex: 1 1 0; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <div>
+        <div class="eyebrow">Signal Engine</div>
+        <h1>Find early alt setups, live breakouts, and overheated pump risk in one scanner.</h1>
+        <p>
+          This version goes beyond simple BTC decorrelation. It blends multi-timeframe structure, compression, momentum expansion, volume quality, and BTC-relative behavior so we can separate pre-pump candidates from active breakouts and late-stage exhaustion.
+        </p>
+      </div>
+      <div class="hero-grid">
+        <article class="mini-card">
+          <div class="mini-label">Detection Modes</div>
+          <div class="mini-v">3</div>
+          <div class="mini-p">Pre-pump, breakout, and exhaustion views use distinct scoring logic.</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-label">Timeframes</div>
+          <div class="mini-v">3x</div>
+          <div class="mini-p">Signals blend fast, medium, and slower structure instead of one lens only.</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-label">Universe</div>
+          <div class="mini-v">120</div>
+          <div class="mini-p">Top liquid Binance USDT pairs after stablecoin and low-volume filtering.</div>
+        </article>
+        <article class="mini-card">
+          <div class="mini-label">Futures Context</div>
+          <div class="mini-v">OI</div>
+          <div class="mini-p">Open interest and funding help confirm whether the move has derivatives participation behind it.</div>
+        </article>
+      </div>
+    </section>
+
+    <section class="topbar">
+      <div class="brand">
+        <div class="pulse"></div>
+        <div>
+          <div class="brand-name mono">Alt Momentum Scanner</div>
+          <div class="brand-sub mono">Binance - Structure, momentum, and pump risk</div>
+        </div>
+      </div>
+      <div class="toolbar">
+        <div class="chip" id="btcChip">BTC -</div>
+        <div class="chip" id="cdChip">Refresh 45s</div>
+        <div class="chip" id="alertChip">Alerts off</div>
+        <button class="button" id="alertBtn" type="button">Enable Alerts</button>
+        <button class="button" id="rescanBtn" type="button">Rescan</button>
+      </div>
+    </section>
+
+    <section class="content">
+      <section class="legend">
+        <div class="legend-item"><span class="dot" style="background:var(--orange)"></span>Pre-pump: compression, quiet strength, and controlled RSI</div>
+        <div class="legend-item"><span class="dot" style="background:var(--teal)"></span>Breakout: range escape with momentum and volume expansion</div>
+        <div class="legend-item"><span class="dot" style="background:var(--red)"></span>Exhaustion: extension risk after a strong move</div>
+        <div class="legend-item"><span class="dot" style="background:var(--yellow)"></span>BTC decorrelation is still tracked but no longer the only edge</div>
+      </section>
+
+      <section class="banner">
+        <div class="banner-grid">
+          <div class="banner-tag" id="leadTag">Best Setup</div>
+          <div class="banner-body">
+            <div>
+              <div class="lead-symbol" id="bSym">-</div>
+              <div class="lead-pair mono" id="bPair">Scanning...</div>
+            </div>
+            <div>
+              <div class="banner-metrics">
+                <div class="metric"><div class="metric-k">Mode</div><div class="metric-v" id="bMode">-</div></div>
+                <div class="metric"><div class="metric-k">Composite</div><div class="metric-v" id="bScoreMini">-</div></div>
+                <div class="metric"><div class="metric-k">Pre-pump</div><div class="metric-v" id="bPre">-</div></div>
+                <div class="metric"><div class="metric-k">Breakout</div><div class="metric-v" id="bBreak">-</div></div>
+                <div class="metric"><div class="metric-k">Exhaustion</div><div class="metric-v" id="bExhaust">-</div></div>
+                <div class="metric"><div class="metric-k">POC Level</div><div class="metric-v" id="bPoc">-</div></div>
+                <div class="metric"><div class="metric-k">Dist From POC</div><div class="metric-v" id="bPocDist">-</div></div>
+                <div class="metric"><div class="metric-k">Structure</div><div class="metric-v" id="bStructure">-</div></div>
+                <div class="metric"><div class="metric-k">Funding</div><div class="metric-v" id="bFunding">-</div></div>
+                <div class="metric"><div class="metric-k">OI</div><div class="metric-v" id="bOi">-</div></div>
+              </div>
+              <p class="lead-why" id="bWhy">Analyzing live market structure...</p>
+            </div>
+            <div class="ring">
+              <svg viewBox="0 0 88 88" aria-hidden="true">
+                <circle class="ring-bg" cx="44" cy="44" r="35"></circle>
+                <circle class="ring-fg" id="ringFg" cx="44" cy="44" r="35" stroke-dasharray="219.8" stroke-dashoffset="219.8"></circle>
+              </svg>
+              <div class="ring-text" id="bScore">-</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="stats">
+        <div class="stat"><div class="metric-k">Scanned</div><div class="stat-v" id="stTotal" style="color:var(--blue)">-</div></div>
+        <div class="stat"><div class="metric-k">Pre-pump</div><div class="stat-v" id="stPre" style="color:var(--orange)">-</div></div>
+        <div class="stat"><div class="metric-k">Breakout</div><div class="stat-v" id="stBreak" style="color:var(--teal)">-</div></div>
+        <div class="stat"><div class="metric-k">Exhaustion</div><div class="stat-v" id="stExhaust" style="color:var(--red)">-</div></div>
+        <div class="stat"><div class="metric-k">Low BTC Corr</div><div class="stat-v" id="stDecorr" style="color:var(--yellow)">-</div></div>
+        <div class="stat"><div class="metric-k">OI Build</div><div class="stat-v" id="stOi" style="color:var(--purple)">-</div></div>
+      </section>
+
+      <section class="glass sector-board">
+        <div class="sector-head">
+          <div>
+            <div class="eyebrow">Sector Heatmap</div>
+            <h2 style="font-size:1.2rem; letter-spacing:-0.03em; margin-top:6px;">See where the tape is clustering before the sympathy move arrives.</h2>
+          </div>
+          <p id="sectorSummary">Waiting for sector breadth and leadership data...</p>
+        </div>
+        <div class="sector-grid" id="sectorGrid">
+          <div class="loading-row">Building sector dashboard...</div>
+        </div>
+      </section>
+
+      <section class="controls">
+        <div class="seg" id="modeSeg">
+          <button class="active" data-value="prepump" type="button">Pre-pump</button>
+          <button data-value="breakout" type="button">Breakout</button>
+          <button data-value="exhaustion" type="button">Exhaustion</button>
+          <button data-value="composite" type="button">Composite</button>
+        </div>
+        <div class="seg" id="viewSeg">
+          <button class="active" data-value="all" type="button">All</button>
+          <button data-value="leaders" type="button">Leaders</button>
+          <button data-value="decorr" type="button">Decorr</button>
+          <button data-value="quiet" type="button">Quiet Bases</button>
+          <button data-value="active" type="button">Active Moves</button>
+          <button data-value="sympathy" type="button">Sympathy</button>
+          <button data-value="lvnrockets" type="button">LVN Rockets</button>
+        </div>
+        <div class="search">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" placeholder="Find coin" />
+        </div>
+        <div class="count" id="ctBadge">-</div>
+      </section>
+
+      <section class="table-shell">
+        <div class="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="rank">#</th>
+                <th data-sort="symbol">Symbol</th>
+                <th data-sort="sectorName">Sector</th>
+                <th data-sort="sectorRS">Sector RS</th>
+                <th data-sort="activeScore">Active</th>
+                <th data-sort="prePumpScore">Pre</th>
+                <th data-sort="breakoutScore">Break</th>
+                <th data-sort="exhaustionScore">Exhaust</th>
+                <th data-sort="corrScore">BTC Corr</th>
+                <th data-sort="btcRel">Vs BTC</th>
+                <th data-sort="change">24H%</th>
+                <th data-sort="trendScore">Trend</th>
+                <th data-sort="compressionScore">Compress</th>
+                <th data-sort="distFromPOC">POC</th>
+                <th data-sort="structureRank">Structure</th>
+                <th data-sort="volRatio">Vol x</th>
+                <th data-sort="oiChange">OIΔ%</th>
+                <th data-sort="fundingRate">Funding</th>
+                <th data-sort="rsiFast">RSI</th>
+                <th data-sort="phaseOrder">Phase</th>
+              </tr>
+            </thead>
+            <tbody id="tBody">
+              <tr><td colspan="20" class="loading-row">Scanning market structure...</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="mobile-list" id="mobileList"></div>
+      </section>
+
+      <section class="pager">
+        <span class="count" id="pgInfo">-</span>
+        <button id="prevBtn" type="button" disabled>Prev</button>
+        <button id="nextBtn" type="button">Next</button>
+      </section>
+    </section>
+  </main>
+  <script>
+    const STABLES = new Set([
+      "USDT","USDC","BUSD","TUSD","USDP","DAI","FDUSD","USDD","GUSD","FRAX","LUSD","SUSD","USTC",
+      "EURC","EUR","GBP","PAXG","WBTC","WETH","BETH","BBTC","USDCE","USDE","PYUSD","AEUR","IDRT","BIDR","BVND"
+    ]);
+
+    const SECTORS = {
+      ETH: "L1", SOL: "L1", AVAX: "L1", ADA: "L1", DOT: "L1", ATOM: "L1", NEAR: "L1", APT: "L1", SUI: "L1", ICP: "L1", SEI: "L1", TIA: "L1",
+      ARB: "L2", OP: "L2", MATIC: "L2", STRK: "L2", ZK: "L2", MNT: "L2", IMX: "L2", METIS: "L2",
+      UNI: "DeFi", AAVE: "DeFi", MKR: "DeFi", COMP: "DeFi", CRV: "DeFi", SNX: "DeFi", SUSHI: "DeFi", "1INCH": "DeFi", RUNE: "DeFi", PENDLE: "DeFi", DYDX: "DeFi", GMX: "DeFi", LDO: "DeFi", CAKE: "DeFi",
+      FET: "AI", AGIX: "AI", OCEAN: "AI", RNDR: "AI", TAO: "AI", WLD: "AI", ARKM: "AI", NMR: "AI", GRT: "AI", PHB: "AI", AI: "AI",
+      AXS: "Gaming", SAND: "Gaming", MANA: "Gaming", GALA: "Gaming", ILV: "Gaming", PIXEL: "Gaming", YGG: "Gaming", MAGIC: "Gaming", BEAMX: "Gaming", ALICE: "Gaming",
+      DOGE: "Meme", SHIB: "Meme", PEPE: "Meme", WIF: "Meme", BONK: "Meme", FLOKI: "Meme", BOME: "Meme", MEME: "Meme", BRETT: "Meme", POPCAT: "Meme", TURBO: "Meme",
+      ONDO: "RWA", LINK: "RWA", POLYX: "RWA", CFG: "RWA", XDC: "RWA", OM: "RWA", TRU: "RWA", PENDLE: "RWA",
+      LINK: "Infra", FIL: "Infra", AR: "Infra", AKT: "Infra", RLC: "Infra", API3: "Infra", BAND: "Infra", QNT: "Infra", HNT: "Infra", STORJ: "Infra", CELR: "Infra", SKL: "Infra",
+      JUP: "Infra", PYTH: "Infra", JTO: "Infra", INJ: "Infra", KAS: "L1", EGLD: "L1", ROSE: "L1", KAVA: "L1"
+    };
+
+    const TIMEFRAME_CONFIG = {
+      prepump: [
+        { key: "fast", interval: "15m", limit: 80, weight: 0.35 },
+        { key: "mid", interval: "1h", limit: 72, weight: 0.4 },
+        { key: "slow", interval: "4h", limit: 60, weight: 0.25 }
+      ],
+      breakout: [
+        { key: "fast", interval: "5m", limit: 80, weight: 0.45 },
+        { key: "mid", interval: "15m", limit: 80, weight: 0.35 },
+        { key: "slow", interval: "1h", limit: 60, weight: 0.2 }
+      ],
+      exhaustion: [
+        { key: "fast", interval: "15m", limit: 80, weight: 0.35 },
+        { key: "mid", interval: "1h", limit: 80, weight: 0.4 },
+        { key: "slow", interval: "4h", limit: 80, weight: 0.25 }
+      ],
+      composite: [
+        { key: "fast", interval: "15m", limit: 80, weight: 0.35 },
+        { key: "mid", interval: "1h", limit: 72, weight: 0.4 },
+        { key: "slow", interval: "4h", limit: 60, weight: 0.25 }
+      ]
+    };
+
+    const state = {
+      allData: [],
+      mode: "prepump",
+      filter: "all",
+      sortKey: "activeScore",
+      sortDir: -1,
+      page: 0,
+      pageSize: 20,
+      search: "",
+      countdown: 45,
+      countdownId: null,
+      alertsEnabled: false,
+      alerted: new Map()
+    };
+
+    function isStable(symbol) { return STABLES.has(symbol) || symbol.startsWith("USD") || symbol.endsWith("USD"); }
+    function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+    function round(value, places = 2) { return Number(value.toFixed(places)); }
+    function avg(values) { return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0; }
+
+    function pctReturns(closes) {
+      const returns = [];
+      for (let i = 1; i < closes.length; i += 1) {
+        const prev = closes[i - 1];
+        returns.push(prev === 0 ? 0 : (closes[i] - prev) / prev);
+      }
+      return returns;
+    }
+
+    function pearson(a, b) {
+      const n = Math.min(a.length, b.length);
+      if (n < 8) return 0;
+      const ax = a.slice(-n);
+      const bx = b.slice(-n);
+      const ma = avg(ax);
+      const mb = avg(bx);
+      let num = 0;
+      let da = 0;
+      let db = 0;
+      for (let i = 0; i < n; i += 1) {
+        const av = ax[i] - ma;
+        const bv = bx[i] - mb;
+        num += av * bv;
+        da += av * av;
+        db += bv * bv;
+      }
+      if (da === 0 || db === 0) return 0;
+      return round(num / Math.sqrt(da * db), 3);
+    }
+
+    function calcRSI(closes, period = 14) {
+      if (closes.length < period + 1) return 50;
+      let gains = 0;
+      let losses = 0;
+      for (let i = closes.length - period; i < closes.length; i += 1) {
+        const delta = closes[i] - closes[i - 1];
+        if (delta > 0) gains += delta;
+        else losses -= delta;
+      }
+      const avgGain = gains / period;
+      const avgLoss = losses / period;
+      if (avgLoss === 0) return 100;
+      return round(100 - 100 / (1 + avgGain / avgLoss), 1);
+    }
+
+    function linearSlope(values) {
+      const n = values.length;
+      if (n < 5) return 0;
+      const xAvg = (n - 1) / 2;
+      const yAvg = avg(values);
+      let num = 0;
+      let den = 0;
+      for (let i = 0; i < n; i += 1) {
+        num += (i - xAvg) * (values[i] - yAvg);
+        den += (i - xAvg) * (i - xAvg);
+      }
+      return den === 0 ? 0 : num / den;
+    }
+
+    function ema(values, period) {
+      if (!values.length) return 0;
+      const k = 2 / (period + 1);
+      let value = values[0];
+      for (let i = 1; i < values.length; i += 1) value = values[i] * k + value * (1 - k);
+      return value;
+    }
+
+    function volumeTrend(volumes) {
+      if (volumes.length < 20) return 1;
+      const recent = avg(volumes.slice(-5));
+      const prior = avg(volumes.slice(-20, -5));
+      return prior > 0 ? round(recent / prior, 2) : 1;
+    }
+
+    function buyPressure(closes, opens, volumes) {
+      let greenVol = 0;
+      let total = 0;
+      for (let i = Math.max(0, closes.length - 12); i < closes.length; i += 1) {
+        const vol = volumes[i] || 0;
+        total += vol;
+        if (closes[i] >= opens[i]) greenVol += vol;
+      }
+      return total === 0 ? 0.5 : round(greenVol / total, 2);
+    }
+
+    function distFromHigh(closes) {
+      if (!closes.length) return 0;
+      const high = Math.max(...closes);
+      return high === 0 ? 0 : round(((closes.at(-1) - high) / high) * 100, 1);
+    }
+
+    function rangeCompression(highs, lows, closes) {
+      if (closes.length < 30) return 0;
+      const recentHighs = highs.slice(-8);
+      const recentLows = lows.slice(-8);
+      const recentCloses = closes.slice(-8);
+      const olderHighs = highs.slice(-30, -8);
+      const olderLows = lows.slice(-30, -8);
+      const olderCloses = closes.slice(-30, -8);
+      const recentRange = avg(recentHighs.map((high, idx) => (high - recentLows[idx]) / recentCloses[idx]));
+      const olderRange = avg(olderHighs.map((high, idx) => (high - olderLows[idx]) / olderCloses[idx]));
+      if (!olderRange) return 0;
+      return round(1 - recentRange / olderRange, 2);
+    }
+
+    function breakoutDistance(highs, closes) {
+      if (closes.length < 24) return 0;
+      const resistance = Math.max(...highs.slice(-24, -1));
+      return resistance === 0 ? 0 : round(((closes.at(-1) - resistance) / resistance) * 100, 2);
+    }
+
+    function estimateVolumeProfile(highs, lows, closes, volumes, bucketCount = 20) {
+      const useHighs = highs.slice(-50);
+      const useLows = lows.slice(-50);
+      const useCloses = closes.slice(-50);
+      const useVolumes = volumes.slice(-50);
+      if (useCloses.length < 10) {
+        return {
+          poc: useCloses.at(-1) || 0,
+          distFromPOC: 0,
+          pocAcceptance: false,
+          lvnAbove: false,
+          structureLabel: "AT POC",
+          structureClass: "structure-at",
+          structureRank: 2
+        };
+      }
+      const rangeLow = Math.min(...useLows);
+      const rangeHigh = Math.max(...useHighs);
+      const range = rangeHigh - rangeLow;
+      if (range <= 0) {
+        return {
+          poc: round(useCloses.at(-1) || 0, 4),
+          distFromPOC: 0,
+          pocAcceptance: false,
+          lvnAbove: false,
+          structureLabel: "AT POC",
+          structureClass: "structure-at",
+          structureRank: 2
+        };
+      }
+      const bucketSize = range / bucketCount;
+      const buckets = Array.from({ length: bucketCount }, () => 0);
+      for (let i = 0; i < useCloses.length; i += 1) {
+        const mid = (useHighs[i] + useLows[i]) / 2;
+        const idx = Math.max(0, Math.min(bucketCount - 1, Math.floor((mid - rangeLow) / bucketSize)));
+        buckets[idx] += useVolumes[i] || 0;
+      }
+      const avgBucketVol = avg(buckets);
+      const pocIdx = buckets.indexOf(Math.max(...buckets));
+      const poc = rangeLow + bucketSize * (pocIdx + 0.5);
+      const currentPrice = useCloses.at(-1);
+      const currentIdx = Math.max(0, Math.min(bucketCount - 1, Math.floor((currentPrice - rangeLow) / bucketSize)));
+      const distFromPOC = poc === 0 ? 0 : round(((currentPrice - poc) / poc) * 100, 2);
+      const lvnZones = buckets.map((value) => value < avgBucketVol * 0.2);
+      const hvnZones = buckets.map((value) => value > avgBucketVol * 1.5);
+      const lvnAbove = currentIdx > pocIdx && lvnZones[currentIdx] === true;
+      const pocAcceptance = useCloses.slice(-3).every((close) => close > poc);
+      let structureLabel = "BELOW POC";
+      let structureClass = "structure-below";
+      let structureRank = 0;
+      if (pocAcceptance && lvnAbove) {
+        structureLabel = "POC ACCEPT + LVN";
+        structureClass = "structure-rocket";
+        structureRank = 3;
+      } else if (pocAcceptance) {
+        structureLabel = "ABOVE POC";
+        structureClass = "structure-above";
+        structureRank = 2;
+      } else if (Math.abs(distFromPOC) <= 0.5) {
+        structureLabel = "AT POC";
+        structureClass = "structure-at";
+        structureRank = 1;
+      }
+      return {
+        poc: round(poc, 4),
+        distFromPOC,
+        pocAcceptance,
+        lvnAbove,
+        structureLabel,
+        structureClass,
+        structureRank,
+        hvnZones,
+        lvnZones
+      };
+    }
+
+    function structureScore(closes) {
+      if (closes.length < 20) return 0;
+      const ema9 = ema(closes, 9);
+      const ema21 = ema(closes, 21);
+      const last = closes.at(-1);
+      let score = 0;
+      if (last > ema9) score += 35;
+      if (ema9 > ema21) score += 35;
+      const slope = linearSlope(closes.slice(-12));
+      score += clamp((slope / last) * 30000, -30, 30);
+      return Math.round(clamp(score, 0, 100));
+    }
+
+    function momentumBurst(closes, volumes) {
+      if (closes.length < 12) return 0;
+      const ret3 = ((closes.at(-1) - closes.at(-4)) / closes.at(-4)) * 100;
+      const ret8 = ((closes.at(-1) - closes.at(-9)) / closes.at(-9)) * 100;
+      const vol = volumeTrend(volumes);
+      return Math.round(clamp(ret3 * 6 + ret8 * 2 + (vol - 1) * 18, 0, 100));
+    }
+
+    function corrLabel(corr) {
+      if (corr <= 0.2) return { text: "FREE", className: "corr-free" };
+      if (corr <= 0.45) return { text: "LOW", className: "corr-low" };
+      if (corr <= 0.7) return { text: "MID", className: "corr-mid" };
+      return { text: "HIGH", className: "corr-high" };
+    }
+
+    function corrScore(corr) {
+      if (corr <= 0) return 100;
+      if (corr <= 0.2) return 92;
+      if (corr <= 0.45) return 74;
+      if (corr <= 0.7) return 48;
+      if (corr <= 0.85) return 24;
+      return 8;
+    }
+
+    function scoreColor(score) {
+      if (score >= 75) return "#ff9d42";
+      if (score >= 58) return "#ab92ff";
+      if (score >= 42) return "#ffb84d";
+      return "#ff617a";
+    }
+
+    function rsiColor(rsi) {
+      if (rsi >= 72) return "#ff617a";
+      if (rsi >= 60) return "#ffb84d";
+      if (rsi >= 40 && rsi <= 55) return "#39ddc3";
+      if (rsi < 30) return "#71b7ff";
+      return "#95a4bf";
+    }
+
+    function phaseFromScores(coin) {
+      if (coin.smartAccumulation || (coin.oiRising && coin.fundingRate < 0.01 && coin.pocAcceptance && coin.corr <= 0.35)) {
+        return { label: "SMART ACCUMULATION", className: "ph-accum", order: 0 };
+      }
+      if (coin.exhaustionScore >= 72) return { label: "EXHAUST", className: "ph-exhaust", order: 3 };
+      if (coin.breakoutScore >= 64) return { label: "BREAKOUT", className: "ph-break", order: 2 };
+      if (coin.prePumpScore >= 62) return { label: "PRE-PUMP", className: "ph-pre", order: 1 };
+      return { label: "NEUTRAL", className: "ph-neutral", order: 4 };
+    }
+
+    function detectLeaderMode(coin) {
+      if (state.mode === "composite") {
+        if (coin.exhaustionScore >= 72) return { text: "Exhaustion", className: "tag-exhaust" };
+        if (coin.breakoutScore >= coin.prePumpScore && coin.breakoutScore >= 60) return { text: "Breakout", className: "tag-break" };
+        if (coin.prePumpScore >= 56) return { text: "Pre-pump", className: "tag-pre" };
+        return { text: "Neutral", className: "tag-neutral" };
+      }
+      if (state.mode === "prepump") return { text: "Pre-pump", className: "tag-pre" };
+      if (state.mode === "breakout") return { text: "Breakout", className: "tag-break" };
+      if (state.mode === "exhaustion") return { text: "Exhaustion", className: "tag-exhaust" };
+      return { text: "Composite", className: "tag-neutral" };
+    }
+
+    function buildWhy(coin) {
+      const notes = [];
+      if (coin.sympathyAlert) notes.push(`${coin.sectorName} sympathy setup`);
+      if (coin.sectorRS < 0) notes.push(`lagging sector by ${Math.abs(coin.sectorRS)}%`);
+      else if (coin.sectorRS > 0) notes.push(`leading sector by ${coin.sectorRS}%`);
+      if (coin.prePumpScore >= 60) notes.push(`compressed base ${coin.compressionScore}`);
+      if (coin.breakoutScore >= 60) notes.push(`breakout pressure ${coin.breakoutDistance}%`);
+      if (coin.exhaustionScore >= 65) notes.push(`extension risk with RSI ${coin.rsiFast}`);
+      if (coin.pocAcceptance && coin.lvnAbove) notes.push(`POC acceptance into LVN`);
+      else if (coin.pocAcceptance) notes.push(`holding above POC`);
+      else if (Math.abs(coin.distFromPOC) <= 0.5) notes.push(`sitting at POC`);
+      if (coin.oiChange >= 3) notes.push(`OI +${coin.oiChange}%`);
+      if (Math.abs(coin.fundingRate) >= 0.01) notes.push(`funding ${formatFunding(coin.fundingRate)}`);
+      if (coin.cvdDelta > 0) notes.push(`buyers aggressive on taker flow`);
+      if (coin.longShortRatio > 1.2) notes.push(`crowd leaning long ${coin.longShortRatio}`);
+      if (coin.btcRel >= 0) notes.push(`outperforming BTC by ${coin.btcRel}%`);
+      if (coin.volRatio >= 1.35) notes.push(`volume x${coin.volRatio}`);
+      if (coin.buyPressure >= 0.58) notes.push(`buy pressure ${Math.round(coin.buyPressure * 100)}%`);
+      notes.push(`BTC corr ${coin.corr}`);
+      return notes.join(" · ");
+    }
+
+    function getActiveSortKey() {
+      if (state.mode === "prepump") return "prePumpScore";
+      if (state.mode === "breakout") return "breakoutScore";
+      if (state.mode === "exhaustion") return "exhaustionScore";
+      return "activeScore";
+    }
+
+    function fundingScore(rate) {
+      const abs = Math.abs(rate);
+      if (rate > 0.08) return 84;
+      if (rate > 0.03) return 68;
+      if (rate >= -0.01 && rate <= 0.03) return 54;
+      if (rate < -0.08) return 72;
+      return 40;
+    }
+
+    function oiScore(changePct) {
+      if (changePct >= 8) return 100;
+      if (changePct >= 4) return 82;
+      if (changePct >= 1.5) return 64;
+      if (changePct >= 0) return 46;
+      if (changePct <= -6) return 8;
+      return 26;
+    }
+
+    function formatFunding(rate) {
+      return `${rate >= 0 ? "+" : ""}${Number(rate || 0).toFixed(3)}%`;
+    }
+
+    function shouldAlert(coin) {
+      return coin.breakoutScore >= 66 &&
+        coin.pocAcceptance === true &&
+        coin.lvnAbove === true &&
+        coin.oiChange >= 3 &&
+        coin.fundingRate > -0.05;
+    }
+
+    function triggerAlerts(data) {
+      if (!state.alertsEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
+      const now = Date.now();
+      data.slice(0, 12).forEach((coin) => {
+        if (!shouldAlert(coin)) return;
+        const existing = state.alerted.get(coin.symbol);
+        if (existing && now - existing < 20 * 60 * 1000) return;
+        state.alerted.set(coin.symbol, now);
+        new Notification(`${coin.symbol} breakout stack`, {
+          body: `${coin.phase.label} | OI ${coin.oiChange >= 0 ? "+" : ""}${coin.oiChange}% | Funding ${formatFunding(coin.fundingRate)} | ${coin.structureLabel}`
+        });
+      });
+    }
+
+    function getView() {
+      let data = [...state.allData];
+      if (state.filter === "leaders") data = data.filter((coin) => coin.activeScore >= 62);
+      if (state.filter === "decorr") data = data.filter((coin) => coin.corr <= 0.35);
+      if (state.filter === "quiet") data = data.filter((coin) => coin.prePumpScore >= 55 && coin.breakoutScore < 62 && coin.exhaustionScore < 60);
+      if (state.filter === "active") data = data.filter((coin) => coin.breakoutScore >= 58 || coin.exhaustionScore >= 65);
+      if (state.filter === "sympathy") data = data.filter((coin) => coin.sympathyAlert === true);
+      if (state.filter === "lvnrockets") data = data.filter((coin) => coin.pocAcceptance === true && coin.lvnAbove === true);
+      if (state.search) data = data.filter((coin) => coin.symbol.includes(state.search.toUpperCase()));
+      return data;
+    }
+
+    function updateStats(data) {
+      document.getElementById("stTotal").textContent = data.length;
+      document.getElementById("stPre").textContent = data.filter((coin) => coin.prePumpScore >= 60).length;
+      document.getElementById("stBreak").textContent = data.filter((coin) => coin.breakoutScore >= 60).length;
+      document.getElementById("stExhaust").textContent = data.filter((coin) => coin.exhaustionScore >= 70).length;
+      document.getElementById("stDecorr").textContent = data.filter((coin) => coin.corr <= 0.35).length;
+      document.getElementById("stOi").textContent = data.filter((coin) => coin.oiRising).length;
+    }
+
+    function buildSectorDashboard(data) {
+      const sectorGrid = document.getElementById("sectorGrid");
+      const sectorSummary = document.getElementById("sectorSummary");
+      const sectorMap = new Map();
+
+      data.forEach((coin) => {
+        if (!coin.sectorName || coin.sectorName === "Other") return;
+        if (!sectorMap.has(coin.sectorName)) sectorMap.set(coin.sectorName, []);
+        sectorMap.get(coin.sectorName).push(coin);
+      });
+
+      const sectors = [...sectorMap.entries()].map(([name, coins]) => {
+        const avgBtcRel = round(avg(coins.map((coin) => coin.btcRel)), 2);
+        const avgVol = round(avg(coins.map((coin) => coin.volRatio)), 2);
+        const avgSectorRS = round(avg(coins.map((coin) => coin.sectorRS || 0)), 2);
+        const sympathyCount = coins.filter((coin) => coin.sympathyAlert).length;
+        const leaders = [...coins]
+          .sort((a, b) => b.btcRel - a.btcRel)
+          .slice(0, 2)
+          .map((coin) => ({ symbol: coin.symbol, btcRel: coin.btcRel }));
+        const laggards = [...coins]
+          .filter((coin) => coin.sectorRS < 0)
+          .sort((a, b) => a.sectorRS - b.sectorRS)
+          .slice(0, 2)
+          .map((coin) => ({ symbol: coin.symbol, sectorRS: coin.sectorRS }));
+        const heatScore = clamp(avgBtcRel * 7 + avgVol * 18 + sympathyCount * 9, 8, 100);
+        return {
+          name,
+          count: coins.length,
+          avgBtcRel,
+          avgVol,
+          avgSectorRS,
+          sympathyCount,
+          leaders,
+          laggards,
+          heatScore: round(heatScore, 0)
+        };
+      }).sort((a, b) => b.heatScore - a.heatScore);
+
+      if (!sectors.length) {
+        sectorSummary.textContent = "No mapped sectors are active in the current filtered set yet.";
+        sectorGrid.innerHTML = `<div class="loading-row">No sector dashboard data available.</div>`;
+        return;
+      }
+
+      const hottest = sectors[0];
+      const sympathyTotal = sectors.reduce((sum, sector) => sum + sector.sympathyCount, 0);
+      sectorSummary.textContent = `${hottest.name} is leading with ${hottest.avgBtcRel > 0 ? "+" : ""}${hottest.avgBtcRel}% average BTC-relative strength, while ${sympathyTotal} sympathy candidates are sitting across the mapped sectors.`;
+
+      sectorGrid.innerHTML = sectors.slice(0, 8).map((sector) => `
+        <article class="sector-card">
+          <div class="sector-top">
+            <div>
+              <div class="sector-name">${sector.name}</div>
+              <div class="sector-count">${sector.count} coins tracked</div>
+            </div>
+            <span class="pill ${sector.sympathyCount > 0 ? "tag-pre" : "tag-neutral"}">${sector.sympathyCount} sympathy</span>
+          </div>
+          <div class="sector-heat">
+            <div class="sector-heat-fill" style="width:${sector.heatScore}%"></div>
+          </div>
+          <div class="sector-metrics">
+            <div class="sector-metric">
+              <div class="metric-k">Avg Vs BTC</div>
+              <div class="metric-v ${sector.avgBtcRel > 0 ? "pos" : sector.avgBtcRel < 0 ? "neg" : "neu"}">${sector.avgBtcRel > 0 ? "+" : ""}${sector.avgBtcRel}%</div>
+            </div>
+            <div class="sector-metric">
+              <div class="metric-k">Avg Vol</div>
+              <div class="metric-v">${sector.avgVol}x</div>
+            </div>
+            <div class="sector-metric">
+              <div class="metric-k">Heat</div>
+              <div class="metric-v" style="color:${scoreColor(sector.heatScore)}">${sector.heatScore}</div>
+            </div>
+            <div class="sector-metric">
+              <div class="metric-k">Laggard Bias</div>
+              <div class="metric-v ${sector.avgSectorRS <= 0 ? "neg" : "pos"}">${sector.avgSectorRS > 0 ? "+" : ""}${sector.avgSectorRS}%</div>
+            </div>
+          </div>
+          <div>
+            <div class="metric-k">Leaders</div>
+            <div class="sector-leaders">
+              ${sector.leaders.map((coin) => `<span class="leader-chip">${coin.symbol} <strong>${coin.btcRel > 0 ? "+" : ""}${coin.btcRel}%</strong></span>`).join("") || `<span class="leader-chip">No leaders</span>`}
+            </div>
+          </div>
+          <div>
+            <div class="metric-k">Best Sympathy Targets</div>
+            <div class="sector-leaders">
+              ${sector.laggards.map((coin) => `<span class="leader-chip">${coin.symbol} <strong>${coin.sectorRS}%</strong></span>`).join("") || `<span class="leader-chip">No laggards</span>`}
+            </div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function applySectorSympathy(results) {
+      const pumpedSectors = new Set();
+      const sectorBuckets = new Map();
+      results.forEach((coin) => {
+        coin.sectorName = SECTORS[coin.symbol] || "Other";
+        coin.sympathyAlert = false;
+        coin.sectorRS = 0;
+        if (coin.sectorName !== "Other" && coin.btcRel > 5 && coin.volRatio > 2) pumpedSectors.add(coin.sectorName);
+        if (coin.sectorName !== "Other") {
+          if (!sectorBuckets.has(coin.sectorName)) sectorBuckets.set(coin.sectorName, []);
+          sectorBuckets.get(coin.sectorName).push(coin);
+        }
+      });
+      sectorBuckets.forEach((coins) => {
+        const sectorAvgBtcRel = avg(coins.map((coin) => coin.btcRel));
+        coins.forEach((coin) => {
+          coin.sectorRS = round(coin.btcRel - sectorAvgBtcRel, 2);
+        });
+      });
+      results.forEach((coin) => {
+        if (
+          coin.sectorName !== "Other" &&
+          pumpedSectors.has(coin.sectorName) &&
+          !(coin.btcRel > 5 && coin.volRatio > 2) &&
+          coin.phase.order < 4
+        ) {
+          coin.sympathyAlert = true;
+          const laggingBoost = coin.sectorRS < 0 ? Math.min(8, Math.abs(coin.sectorRS) * 1.5) : 0;
+          coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 10 + laggingBoost, 0, 100));
+          coin.activeScore = Math.round(clamp(coin.activeScore + 8 + laggingBoost, 0, 100));
+        }
+      });
+    }
+
+    function renderBanner(data) {
+      const top = data.find((coin) => coin.sympathyAlert) || data[0];
+      if (!top) return;
+      const key = getActiveSortKey();
+      const score = top[key];
+      const color = scoreColor(score);
+      const modeTag = detectLeaderMode(top);
+      const corrTag = corrLabel(top.corr);
+      document.getElementById("leadTag").textContent = `${modeTag.text} Lead`;
+      document.getElementById("bSym").textContent = top.symbol;
+      document.getElementById("bSym").style.color = color;
+      document.getElementById("bPair").textContent = `${top.symbol}/BTC · ${top.phase.label}`;
+      document.getElementById("bMode").innerHTML = `<span class="pill ${modeTag.className}">${modeTag.text}</span>`;
+      document.getElementById("bScoreMini").textContent = top.activeScore;
+      document.getElementById("bPre").textContent = top.prePumpScore;
+      document.getElementById("bBreak").textContent = top.breakoutScore;
+      document.getElementById("bExhaust").textContent = top.exhaustionScore;
+      document.getElementById("bPoc").textContent = top.poc.toFixed(4);
+      document.getElementById("bPocDist").textContent = `${top.distFromPOC > 0 ? "+" : ""}${top.distFromPOC}%`;
+      document.getElementById("bStructure").innerHTML = `<span class="pill ${top.structureClass}">${top.structureLabel}</span>`;
+      document.getElementById("bFunding").textContent = formatFunding(top.fundingRate);
+      document.getElementById("bOi").textContent = `${top.oiChange >= 0 ? "+" : ""}${top.oiChange}%`;
+      document.getElementById("bWhy").textContent = buildWhy(top);
+      document.getElementById("bScore").textContent = score;
+      document.getElementById("bScore").style.color = color;
+      const ring = document.getElementById("ringFg");
+      ring.style.stroke = color;
+      ring.style.strokeDashoffset = 219.8 - (score / 100) * 219.8;
+    }
+
+    function sortData(key) {
+      if (state.sortKey === key) state.sortDir *= -1;
+      else {
+        state.sortKey = key;
+        state.sortDir = -1;
+      }
+      state.allData.sort((a, b) => {
+        const aVal = key === "phaseOrder" ? a.phase.order : a[key];
+        const bVal = key === "phaseOrder" ? b.phase.order : b[key];
+        if (typeof aVal === "string") return aVal.localeCompare(bVal) * state.sortDir;
+        if (aVal === bVal) return 0;
+        return (aVal > bVal ? 1 : -1) * state.sortDir;
+      });
+      state.allData.forEach((coin, index) => { coin.rank = index + 1; });
+      state.page = 0;
+      renderTable();
+    }
+
+    function renderTable() {
+      const data = getView();
+      document.getElementById("ctBadge").textContent = `${data.length} pairs`;
+      renderBanner(data);
+      const totalPages = Math.max(1, Math.ceil(data.length / state.pageSize));
+      state.page = Math.min(state.page, totalPages - 1);
+      const slice = data.slice(state.page * state.pageSize, (state.page + 1) * state.pageSize);
+      document.getElementById("pgInfo").textContent = `${state.page + 1} / ${totalPages}`;
+      document.getElementById("prevBtn").disabled = state.page === 0;
+      document.getElementById("nextBtn").disabled = state.page >= totalPages - 1;
+
+      const tbody = document.getElementById("tBody");
+      const mobileList = document.getElementById("mobileList");
+      if (!slice.length) {
+        tbody.innerHTML = `<tr><td colspan="20" class="loading-row">No results for this filter.</td></tr>`;
+        mobileList.innerHTML = `<div class="loading-row">No results for this filter.</div>`;
+        return;
+      }
+
+      tbody.innerHTML = slice.map((coin) => {
+        const scoreClr = scoreColor(coin.activeScore);
+        const corrTag = corrLabel(coin.corr);
+        const corrWidth = Math.round(Math.abs(coin.corr) * 100);
+        return `
+          <tr>
+            <td>${coin.rank}</td>
+            <td class="symbol-cell">${coin.symbol}<span class="sub"> /BTC</span></td>
+            <td>
+              <span class="pill sector-chip">${coin.sectorName || "Other"}</span>
+              ${coin.sympathyAlert ? '<span class="pill sympathy-badge">⚡ Sympathy</span>' : ""}
+            </td>
+            <td class="${coin.sectorRS > 0 ? "pos" : coin.sectorRS < 0 ? "neg" : "neu"}">${coin.sectorRS > 0 ? "+" : ""}${coin.sectorRS}%</td>
+            <td><div class="score-wrap"><span style="color:${scoreClr}">${coin.activeScore}</span><div class="bar"><div class="fill" style="width:${coin.activeScore}%;background:${scoreClr}"></div></div></div></td>
+            <td>${coin.prePumpScore}</td>
+            <td>${coin.breakoutScore}</td>
+            <td>${coin.exhaustionScore}</td>
+            <td><div class="corr-wrap"><div class="small-bar"><div class="fill" style="width:${corrWidth}%;background:${scoreClr}"></div></div><span class="pill ${corrTag.className}">${corrTag.text} ${coin.corr}</span></div></td>
+            <td class="${coin.btcRel > 0 ? "pos" : coin.btcRel < 0 ? "neg" : "neu"}">${coin.btcRel > 0 ? "+" : ""}${coin.btcRel}%</td>
+            <td class="${coin.change > 0 ? "pos" : coin.change < 0 ? "neg" : "neu"}">${coin.change > 0 ? "+" : ""}${coin.change.toFixed(2)}%</td>
+            <td>${coin.trendScore}</td>
+            <td>${coin.compressionScore}</td>
+            <td>${coin.distFromPOC > 0 ? "+" : ""}${coin.distFromPOC}%</td>
+            <td><span class="pill ${coin.structureClass}">${coin.structureLabel}</span></td>
+            <td>${coin.volRatio.toFixed(1)}x</td>
+            <td class="${coin.oiChange >= 0 ? "pos" : "neg"}">${coin.oiChange >= 0 ? "+" : ""}${coin.oiChange}%</td>
+            <td style="color:${coin.fundingRate > 0.05 ? "var(--red)" : coin.fundingRate < 0 ? "var(--green)" : "var(--muted)"}">${formatFunding(coin.fundingRate)}</td>
+            <td><div class="rsi-wrap"><span style="color:${rsiColor(coin.rsiFast)}">${coin.rsiFast}</span><div class="small-bar"><div class="fill" style="width:${coin.rsiFast}%;background:${rsiColor(coin.rsiFast)}"></div></div></div></td>
+            <td><span class="pill ${coin.phase.className}">${coin.phase.label}</span></td>
+          </tr>
+        `;
+      }).join("");
+
+      mobileList.innerHTML = slice.map((coin) => {
+        const scoreClr = scoreColor(coin.activeScore);
+        const modeTag = detectLeaderMode(coin);
+        return `
+          <article class="coin-card">
+            <div class="coin-head">
+              <div>
+                <div class="coin-symbol">${coin.symbol}</div>
+                <div class="coin-sub">Rank #${coin.rank} · /BTC</div>
+              </div>
+              <span class="pill ${coin.phase.className}">${coin.phase.label}</span>
+            </div>
+            <div class="coin-row">
+              <div class="score-wrap">
+                <span style="color:${scoreClr}">${coin.activeScore}</span>
+                <div class="bar"><div class="fill" style="width:${coin.activeScore}%;background:${scoreClr}"></div></div>
+              </div>
+              <span class="pill ${modeTag.className}">${modeTag.text}</span>
+            </div>
+            <div class="coin-grid">
+              <div class="coin-metric"><div class="metric-k">Pre-pump</div><div>${coin.prePumpScore}</div></div>
+              <div class="coin-metric"><div class="metric-k">Sector</div><div>${coin.sectorName || "Other"}${coin.sympathyAlert ? " ⚡" : ""}</div></div>
+              <div class="coin-metric"><div class="metric-k">Sector RS</div><div class="${coin.sectorRS > 0 ? "pos" : coin.sectorRS < 0 ? "neg" : "neu"}">${coin.sectorRS > 0 ? "+" : ""}${coin.sectorRS}%</div></div>
+              <div class="coin-metric"><div class="metric-k">Breakout</div><div>${coin.breakoutScore}</div></div>
+              <div class="coin-metric"><div class="metric-k">Exhaustion</div><div>${coin.exhaustionScore}</div></div>
+              <div class="coin-metric"><div class="metric-k">BTC Corr</div><div>${coin.corr}</div></div>
+              <div class="coin-metric"><div class="metric-k">Vs BTC</div><div class="${coin.btcRel > 0 ? "pos" : coin.btcRel < 0 ? "neg" : "neu"}">${coin.btcRel > 0 ? "+" : ""}${coin.btcRel}%</div></div>
+              <div class="coin-metric"><div class="metric-k">24H%</div><div class="${coin.change > 0 ? "pos" : coin.change < 0 ? "neg" : "neu"}">${coin.change > 0 ? "+" : ""}${coin.change.toFixed(2)}%</div></div>
+              <div class="coin-metric"><div class="metric-k">Trend</div><div>${coin.trendScore}</div></div>
+              <div class="coin-metric"><div class="metric-k">Compression</div><div>${coin.compressionScore}</div></div>
+              <div class="coin-metric"><div class="metric-k">POC Level</div><div>${coin.poc.toFixed(4)}</div></div>
+              <div class="coin-metric"><div class="metric-k">Dist From POC</div><div>${coin.distFromPOC > 0 ? "+" : ""}${coin.distFromPOC}%</div></div>
+              <div class="coin-metric"><div class="metric-k">Structure</div><div>${coin.structureLabel}</div></div>
+              <div class="coin-metric"><div class="metric-k">Acceptance</div><div>${coin.pocAcceptance ? "YES" : "NO"}${coin.lvnAbove ? " + LVN" : ""}</div></div>
+              <div class="coin-metric"><div class="metric-k">OIΔ%</div><div class="${coin.oiChange >= 0 ? "pos" : "neg"}">${coin.oiChange >= 0 ? "+" : ""}${coin.oiChange}%</div></div>
+              <div class="coin-metric"><div class="metric-k">Funding</div><div style="color:${coin.fundingRate > 0.05 ? "var(--red)" : coin.fundingRate < 0 ? "var(--green)" : "var(--muted)"}">${formatFunding(coin.fundingRate)}</div></div>
+            </div>
+          </article>
+        `;
+      }).join("");
+    }
+
+    function scoreTimeframe(metrics, weight) {
+      return {
+        pre:
+          (metrics.compression > 0.18 ? 26 : 8) +
+          (metrics.rsi >= 42 && metrics.rsi <= 58 ? 22 : metrics.rsi >= 35 && metrics.rsi <= 62 ? 12 : 3) +
+          (metrics.breakoutDistance >= -2 && metrics.breakoutDistance <= 1.5 ? 16 : 4) +
+          (metrics.pocAcceptance && metrics.lvnAbove ? 25 : metrics.pocAcceptance ? 15 : 0) +
+          (metrics.distFromPOC > 0 && metrics.distFromPOC < 3 ? 10 : 0) +
+          (metrics.volTrend >= 1.1 && metrics.volTrend <= 2.4 ? 16 : 6) +
+          (metrics.buyPressure >= 0.54 ? 12 : 4) +
+          (metrics.trend >= 46 && metrics.trend <= 82 ? 14 : 6),
+        breakout:
+          (metrics.breakoutDistance > 0 ? 28 : metrics.breakoutDistance > -1 ? 15 : 4) +
+          (metrics.momentum >= 55 ? 24 : metrics.momentum >= 35 ? 14 : 5) +
+          (metrics.pocAcceptance && metrics.lvnAbove ? 18 : metrics.pocAcceptance ? 10 : 2) +
+          (metrics.volTrend >= 1.35 ? 18 : metrics.volTrend >= 1.1 ? 10 : 3) +
+          (metrics.buyPressure >= 0.58 ? 14 : 5) +
+          (metrics.trend >= 60 ? 16 : 6),
+        exhaustion:
+          (metrics.rsi >= 72 ? 28 : metrics.rsi >= 66 ? 18 : 4) +
+          (metrics.breakoutDistance >= 3 ? 18 : metrics.breakoutDistance >= 1.5 ? 10 : 2) +
+          (metrics.momentum >= 72 ? 20 : metrics.momentum >= 55 ? 12 : 3) +
+          (metrics.distFromPOC >= 2 ? 10 : metrics.distFromPOC >= 0.8 ? 6 : 2) +
+          (metrics.distFromHigh >= -1 ? 14 : 5) +
+          (metrics.volTrend >= 1.8 ? 12 : 4) +
+          (metrics.buyPressure >= 0.65 ? 8 : 3),
+        trend: metrics.trend * weight,
+        compression: clamp(Math.round(metrics.compression * 100), 0, 100) * weight
+      };
+    }
+
+    function aggregateCoin(symbol, ticker, framePayloads, btcChange) {
+      const frames = framePayloads.map(({ config, klines, btcReturns }) => {
+        const closes = klines.map((k) => Number(k[4]));
+        const highs = klines.map((k) => Number(k[2]));
+        const lows = klines.map((k) => Number(k[3]));
+        const opens = klines.map((k) => Number(k[1]));
+        const volumes = klines.map((k) => Number(k[5]));
+        const profile = estimateVolumeProfile(highs, lows, closes, volumes);
+        return {
+          key: config.key,
+          interval: config.interval,
+          weight: config.weight,
+          corr: pearson(btcReturns, pctReturns(closes)),
+          rsi: calcRSI(closes),
+          volTrend: volumeTrend(volumes),
+          buyPressure: buyPressure(closes, opens, volumes),
+          distFromHigh: distFromHigh(closes),
+          compression: rangeCompression(highs, lows, closes),
+          breakoutDistance: breakoutDistance(highs, closes),
+          poc: profile.poc,
+          distFromPOC: profile.distFromPOC,
+          pocAcceptance: profile.pocAcceptance,
+          lvnAbove: profile.lvnAbove,
+          structureLabel: profile.structureLabel,
+          structureClass: profile.structureClass,
+          structureRank: profile.structureRank,
+          trend: structureScore(closes),
+          momentum: momentumBurst(closes, volumes)
+        };
+      });
+
+      const weighted = frames.map((frame) => scoreTimeframe(frame, frame.weight));
+      const weightedSum = (key) => Math.round(clamp(weighted.reduce((sum, frame) => sum + frame[key], 0), 0, 100));
+      const corr = round(frames.reduce((sum, frame) => sum + frame.corr * frame.weight, 0), 3);
+      const coin = {
+        symbol,
+        change: Number(ticker.priceChangePercent),
+        btcRel: round(Number(ticker.priceChangePercent) - btcChange, 2),
+        corr,
+        corrScore: corrScore(corr),
+        prePumpScore: weightedSum("pre"),
+        breakoutScore: weightedSum("breakout"),
+        exhaustionScore: weightedSum("exhaustion"),
+        trendScore: Math.round(clamp(weighted.reduce((sum, frame) => sum + frame.trend, 0), 0, 100)),
+        compressionScore: Math.round(clamp(weighted.reduce((sum, frame) => sum + frame.compression, 0), 0, 100)),
+        volRatio: round(avg(frames.map((frame) => frame.volTrend)), 2),
+        buyPressure: round(avg(frames.map((frame) => frame.buyPressure)), 2),
+        breakoutDistance: round(avg(frames.map((frame) => frame.breakoutDistance)), 2),
+        rsiFast: frames[0].rsi,
+        poc: round(frames.at(-1).poc, 4),
+        distFromPOC: round(frames.at(-1).distFromPOC, 2),
+        pocAcceptance: frames.at(-1).pocAcceptance,
+        lvnAbove: frames.at(-1).lvnAbove,
+        structureLabel: frames.at(-1).structureLabel,
+        structureClass: frames.at(-1).structureClass,
+        structureRank: frames.at(-1).structureRank,
+        fundingRate: 0,
+        fundingScore: 0,
+        latestOi: 0,
+        openInterest: 0,
+        oiChangePct: 0,
+        oiChange: 0,
+        oiRising: false,
+        oiScore: 0,
+        longShortRatio: 1,
+        cvdDelta: 0,
+        fundingDanger: false,
+        fundingNegative: false,
+        smartAccumulation: false
+      };
+      coin.activeScore = Math.round(clamp(
+        coin.prePumpScore * 0.34 +
+        coin.breakoutScore * 0.34 +
+        (100 - coin.exhaustionScore) * 0.14 +
+        coin.corrScore * 0.1 +
+        coin.trendScore * 0.05 +
+        (coin.pocAcceptance ? 70 : 20) * 0.04 +
+        (coin.lvnAbove ? 90 : 20) * 0.06,
+        0,
+        100
+      ));
+      coin.phase = phaseFromScores(coin);
+      return coin;
+    }
+
+    async function fetchJson(url) {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 12000);
+      try {
+        const response = await fetch(url, {
+          method: "GET",
+          mode: "cors",
+          cache: "no-store",
+          signal: controller.signal
+        });
+        if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+        return response.json();
+      } catch (error) {
+        if (error?.name === "AbortError") throw new Error("Request timed out");
+        throw error;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    async function loadFrameMarket(config) {
+      const [btcKlines, tickers] = await Promise.all([
+        fetchJson(`https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=${config.interval}&limit=${config.limit}`),
+        fetchJson("https://api.binance.com/api/v3/ticker/24hr")
+      ]);
+      return { config, tickers, btcReturns: pctReturns(btcKlines.map((k) => Number(k[4]))) };
+    }
+
+    async function fetchDerivativesData(symbol) {
+      const sym = symbol.endsWith("USDT") ? symbol : `${symbol}USDT`;
+
+      const [oi, funding, lsRatio, takerRatio] = await Promise.all([
+        fetchJson(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${sym}`),
+        fetchJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`),
+        fetchJson(`https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${sym}&period=1h&limit=3`),
+        fetchJson(`https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=${sym}&period=1h&limit=5`)
+      ]);
+
+      const oiHist = await fetchJson(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${sym}&period=1h&limit=5`);
+
+      const oiNow = parseFloat(oi?.openInterest || 0);
+      const oiPrev = Array.isArray(oiHist) && oiHist.length >= 2 ? parseFloat(oiHist[oiHist.length - 2]?.sumOpenInterest || oiNow) : oiNow;
+      const oiChangePct = oiPrev > 0 ? parseFloat((((oiNow - oiPrev) / oiPrev) * 100).toFixed(2)) : 0;
+      const fundingRate = parseFloat(((parseFloat(funding?.lastFundingRate || 0)) * 100).toFixed(3));
+
+      let cvdDelta = 0;
+      if (Array.isArray(takerRatio)) {
+        takerRatio.forEach((row) => {
+          cvdDelta += parseFloat(row.buyVol || 0) - parseFloat(row.sellVol || 0);
+        });
+      }
+
+      return {
+        openInterest: oiNow,
+        latestOi: round(oiNow, 2),
+        oiChangePct,
+        oiChange: oiChangePct,
+        fundingRate,
+        longShortRatio: parseFloat(lsRatio?.[0]?.longShortRatio || 1),
+        cvdDelta: round(cvdDelta, 2),
+        oiRising: oiChangePct > 2,
+        fundingDanger: fundingRate > 0.05,
+        fundingNegative: fundingRate < 0,
+        smartAccumulation: oiChangePct > 2 && fundingRate < 0.01 && cvdDelta > 0
+      };
+    }
+
+    async function fetchAll() {
+      const tbody = document.getElementById("tBody");
+      const mobileList = document.getElementById("mobileList");
+        tbody.innerHTML = `<tr><td colspan="20" class="loading-row">Scanning market structure...</td></tr>`;
+      mobileList.innerHTML = `<div class="loading-row">Scanning market structure...</div>`;
+      clearInterval(state.countdownId);
+      document.getElementById("cdChip").textContent = "Refreshing...";
+
+      try {
+        const configs = TIMEFRAME_CONFIG[state.mode];
+        const marketFrames = await Promise.all(configs.map(loadFrameMarket));
+        const baseTickers = marketFrames[0].tickers;
+        const btcTicker = baseTickers.find((ticker) => ticker.symbol === "BTCUSDT");
+        const btcChange = Number(btcTicker?.priceChangePercent || 0);
+        document.getElementById("btcChip").innerHTML = `BTC <span style="color:${btcChange >= 0 ? "#00e676" : "#ff617a"}">${btcChange >= 0 ? "+" : ""}${btcChange.toFixed(2)}%</span>`;
+
+        const pairs = baseTickers
+          .filter((ticker) => ticker.symbol.endsWith("USDT") && !isStable(ticker.symbol.replace("USDT", "")))
+          .filter((ticker) => Number(ticker.quoteVolume) > 2500000)
+          .sort((a, b) => Number(b.quoteVolume) - Number(a.quoteVolume))
+          .slice(0, 120);
+
+        const results = [];
+        for (let i = 0; i < pairs.length; i += 8) {
+          const batch = pairs.slice(i, i + 8);
+          const batchResults = await Promise.all(batch.map(async (ticker) => {
+            try {
+              const framePayloads = await Promise.all(marketFrames.map(async (frame) => {
+                const klines = await fetchJson(`https://api.binance.com/api/v3/klines?symbol=${ticker.symbol}&interval=${frame.config.interval}&limit=${frame.config.limit}`);
+                return { config: frame.config, klines, btcReturns: frame.btcReturns };
+              }));
+              const coin = aggregateCoin(ticker.symbol.replace("USDT", ""), ticker, framePayloads, btcChange);
+              try {
+                const futures = await fetchDerivativesData(ticker.symbol);
+                coin.openInterest = futures.openInterest;
+                coin.latestOi = futures.latestOi;
+                coin.fundingRate = futures.fundingRate;
+                coin.oiChangePct = futures.oiChangePct;
+                coin.oiChange = futures.oiChange;
+                coin.oiRising = futures.oiRising;
+                coin.longShortRatio = futures.longShortRatio;
+                coin.cvdDelta = futures.cvdDelta;
+                coin.fundingDanger = futures.fundingDanger;
+                coin.fundingNegative = futures.fundingNegative;
+                coin.smartAccumulation = futures.smartAccumulation;
+              } catch {
+                coin.openInterest = 0;
+                coin.latestOi = 0;
+                coin.fundingRate = 0;
+                coin.oiChangePct = 0;
+                coin.oiChange = 0;
+                coin.oiRising = false;
+                coin.longShortRatio = 1;
+                coin.cvdDelta = 0;
+                coin.fundingDanger = false;
+                coin.fundingNegative = false;
+                coin.smartAccumulation = false;
+              }
+              coin.fundingScore = fundingScore(coin.fundingRate);
+              coin.oiScore = oiScore(coin.oiChange);
+              if (coin.oiRising && coin.change > 0 && coin.fundingRate < 0.01) {
+                coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 20, 0, 100));
+              }
+              if (coin.fundingRate > 0.08) {
+                coin.prePumpScore = Math.round(clamp(coin.prePumpScore - 15, 0, 100));
+              }
+              if (coin.smartAccumulation) {
+                coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 8, 0, 100));
+                coin.activeScore = Math.round(clamp(coin.activeScore + 6, 0, 100));
+              }
+              coin.activeScore = Math.round(clamp(
+                coin.activeScore * 0.86 +
+                coin.fundingScore * 0.05 +
+                coin.oiScore * 0.09,
+                0,
+                100
+              ));
+              coin.breakoutScore = Math.round(clamp(coin.breakoutScore * 0.9 + coin.oiScore * 0.1, 0, 100));
+              coin.phase = phaseFromScores(coin);
+              return coin;
+            } catch {
+              return null;
+            }
+          }));
+          batchResults.filter(Boolean).forEach((coin) => results.push(coin));
+        }
+
+        const primaryKey = getActiveSortKey();
+        applySectorSympathy(results);
+        results.sort((a, b) => {
+          if (b[primaryKey] !== a[primaryKey]) return b[primaryKey] - a[primaryKey];
+          if (a.sympathyAlert !== b.sympathyAlert) return a.sympathyAlert ? -1 : 1;
+          if (a.phase.order !== b.phase.order) return a.phase.order - b.phase.order;
+          return b.activeScore - a.activeScore;
+        });
+        results.forEach((coin, index) => { coin.rank = index + 1; });
+
+        state.allData = results;
+        state.sortKey = primaryKey;
+        state.sortDir = -1;
+        state.page = 0;
+        updateStats(results);
+        buildSectorDashboard(results);
+        renderTable();
+        triggerAlerts(results);
+        startCountdown();
+      } catch (error) {
+        const friendlyError = error?.message?.includes("Failed to fetch") || error?.message?.includes("timed out")
+          ? "Live Binance data is temporarily unavailable. Try again in a moment or deploy with a small proxy for steadier access."
+          : error.message;
+        tbody.innerHTML = `<tr><td colspan="20" class="loading-row" style="color:#ff617a;">${friendlyError}</td></tr>`;
+        mobileList.innerHTML = `<div class="loading-row" style="color:#ff617a;">${friendlyError}</div>`;
+        document.getElementById("sectorGrid").innerHTML = `<div class="loading-row" style="color:#ff617a;">Sector dashboard unavailable.</div>`;
+        document.getElementById("sectorSummary").textContent = "Sector dashboard is waiting for fresh data.";
+        document.getElementById("btcChip").textContent = "BTC unavailable";
+        document.getElementById("cdChip").textContent = "Retry later";
+      }
+    }
+
+    function startCountdown() {
+      clearInterval(state.countdownId);
+      state.countdown = 45;
+      document.getElementById("cdChip").textContent = `Refresh ${state.countdown}s`;
+      state.countdownId = setInterval(() => {
+        state.countdown -= 1;
+        document.getElementById("cdChip").textContent = `Refresh ${state.countdown}s`;
+        if (state.countdown <= 0) {
+          clearInterval(state.countdownId);
+          fetchAll();
+        }
+      }, 1000);
+    }
+
+    async function enableAlerts() {
+      if (!("Notification" in window)) {
+        document.getElementById("alertChip").textContent = "Alerts unsupported";
+        return;
+      }
+      const permission = await Notification.requestPermission();
+      state.alertsEnabled = permission === "granted";
+      document.getElementById("alertChip").textContent = state.alertsEnabled ? "Alerts on" : "Alerts blocked";
+      document.getElementById("alertBtn").textContent = state.alertsEnabled ? "Alerts Enabled" : "Enable Alerts";
+    }
+
+    if ("Notification" in window && Notification.permission === "granted") {
+      state.alertsEnabled = true;
+      document.getElementById("alertChip").textContent = "Alerts on";
+      document.getElementById("alertBtn").textContent = "Alerts Enabled";
+    }
+
+    document.getElementById("rescanBtn").addEventListener("click", fetchAll);
+    document.getElementById("alertBtn").addEventListener("click", enableAlerts);
+    document.getElementById("searchInput").addEventListener("input", (event) => {
+      state.search = event.target.value.trim();
+      state.page = 0;
+      renderTable();
+    });
+    document.getElementById("prevBtn").addEventListener("click", () => {
+      state.page = Math.max(0, state.page - 1);
+      renderTable();
+    });
+    document.getElementById("nextBtn").addEventListener("click", () => {
+      const total = Math.max(1, Math.ceil(getView().length / state.pageSize));
+      state.page = Math.min(total - 1, state.page + 1);
+      renderTable();
+    });
+    document.querySelectorAll("#modeSeg button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("#modeSeg button").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        state.mode = button.dataset.value;
+        fetchAll();
+      });
+    });
+    document.querySelectorAll("#viewSeg button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelectorAll("#viewSeg button").forEach((node) => node.classList.remove("active"));
+        button.classList.add("active");
+        state.filter = button.dataset.value;
+        state.page = 0;
+        renderTable();
+      });
+    });
+    document.querySelectorAll("th[data-sort]").forEach((header) => {
+      header.addEventListener("click", () => sortData(header.dataset.sort));
+    });
+    fetchAll();
+  </script>
+</body>
+</html>
