@@ -231,6 +231,16 @@
       border: 1px solid rgba(255,255,255,0.05);
       display: grid;
       gap: 10px;
+      cursor: pointer;
+      transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+    }
+    .sector-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(57,221,195,0.22);
+    }
+    .sector-card.active {
+      border-color: rgba(57,221,195,0.34);
+      box-shadow: 0 0 24px rgba(57,221,195,0.08);
     }
     .sector-top {
       display: flex;
@@ -296,6 +306,48 @@
     .leader-chip strong {
       font-weight: 600;
       color: var(--teal);
+    }
+    .section-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .subtle-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
+      max-width: 68ch;
+    }
+    .alert-board {
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+    .alert-list {
+      display: grid;
+      gap: 10px;
+    }
+    .alert-item {
+      display: grid;
+      gap: 8px;
+      padding: 14px;
+      border-radius: 18px;
+      background: var(--surface-2);
+      border: 1px solid rgba(255,255,255,0.05);
+    }
+    .alert-top {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+    .alert-copy {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
     }
     .controls {
       padding: 14px;
@@ -629,6 +681,19 @@
         </div>
       </section>
 
+      <section class="glass alert-board">
+        <div class="section-head">
+          <div>
+            <div class="eyebrow">Setup Alerts</div>
+            <div style="font-size:1.1rem; letter-spacing:-0.03em; margin-top:6px;">Fresh POC flips, best-stack setups, and sector leaders show up here first.</div>
+          </div>
+          <div class="subtle-copy" id="alertSummary">Waiting for live setup confirmations...</div>
+        </div>
+        <div class="alert-list" id="alertList">
+          <div class="loading-row">No live alerts yet.</div>
+        </div>
+      </section>
+
       <section class="controls">
         <div class="seg" id="modeSeg">
           <button class="active" data-value="prepump" type="button">Pre-pump</button>
@@ -724,11 +789,22 @@
       { id: "exchange-based-tokens", label: "CEX" },
       { id: "infrastructure", label: "Infra" },
       { id: "liquid-staking-tokens", label: "LST" },
-      { id: "analytics", label: "Data" }
+      { id: "analytics", label: "Data" },
+      { id: "interoperability", label: "Interop" },
+      { id: "privacy-coins", label: "Privacy" },
+      { id: "depin", label: "DePIN" },
+      { id: "storage", label: "Storage" },
+      { id: "launchpad", label: "Launchpad" },
+      { id: "yield-farming", label: "Yield" },
+      { id: "prediction-markets", label: "Predictions" },
+      { id: "socialfi", label: "Social" },
+      { id: "btcfi", label: "BTCFi" }
     ];
 
     let SECTOR_MAP = { ...SECTORS };
     let sectorMapLoaded = false;
+    const SECTOR_CACHE_KEY = "altsScannerSectorMapV2";
+    const SECTOR_CACHE_TTL = 1000 * 60 * 60 * 12;
 
     const TIMEFRAME_CONFIG = {
       prepump: [
@@ -757,6 +833,7 @@
       allData: [],
       mode: "prepump",
       filter: "all",
+      activeSector: "all",
       sortKey: "activeScore",
       sortDir: -1,
       page: 0,
@@ -765,7 +842,8 @@
       countdown: 45,
       countdownId: null,
       alertsEnabled: false,
-      alerted: new Map()
+      alerted: new Map(),
+      recentAlerts: []
     };
 
     function isStable(symbol) { return STABLES.has(symbol) || symbol.startsWith("USD") || symbol.endsWith("USD"); }
@@ -1089,27 +1167,83 @@
     function shouldAlert(coin) {
       return coin.breakoutScore >= 66 &&
         coin.pocAcceptance === true &&
-        coin.lvnAbove === true &&
-        coin.oiChange >= 3 &&
+        (coin.lvnAbove === true || (coin.distFromPOC > 0 && coin.distFromPOC < 2.5)) &&
+        coin.oiChange >= 2 &&
         coin.fundingRate > -0.05;
     }
 
+    function isBestSetup(coin) {
+      return coin.activeScore >= 78 &&
+        coin.pocAcceptance === true &&
+        coin.breakoutScore >= 64 &&
+        (coin.smartAccumulation || coin.sympathyAlert || coin.sectorRS < 0);
+    }
+
+    function renderAlertFeed() {
+      const alertList = document.getElementById("alertList");
+      const alertSummary = document.getElementById("alertSummary");
+      if (!state.recentAlerts.length) {
+        alertSummary.textContent = "Waiting for live setup confirmations...";
+        alertList.innerHTML = `<div class="loading-row">No live alerts yet.</div>`;
+        return;
+      }
+      const latest = state.recentAlerts[0];
+      alertSummary.textContent = `${latest.symbol} is the freshest live setup, with ${state.recentAlerts.length} alert-ready coins currently tracked.`;
+      alertList.innerHTML = state.recentAlerts.slice(0, 6).map((item) => `
+        <article class="alert-item">
+          <div class="alert-top">
+            <div>
+              <div class="lead-symbol" style="font-size:1.1rem;">${item.symbol}</div>
+              <div class="lead-pair mono">${item.phase} | ${item.timestamp}</div>
+            </div>
+            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+              <span class="pill ${item.kind === "POC Break" ? "tag-break" : "tag-pre"}">${item.kind}</span>
+              <span class="pill ${item.className}">${item.score}</span>
+            </div>
+          </div>
+          <div class="alert-copy">${item.reason}</div>
+        </article>
+      `).join("");
+    }
+
     function triggerAlerts(data) {
-      if (!state.alertsEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
       const now = Date.now();
+      const freshAlerts = [];
+      data.slice(0, 16).forEach((coin) => {
+        const pocBreak = coin.pocAcceptance && coin.distFromPOC > 0 && coin.distFromPOC < 2.5;
+        const bestSetup = isBestSetup(coin);
+        if (!pocBreak && !bestSetup && !shouldAlert(coin)) return;
+        const kind = bestSetup ? "Best Setup" : pocBreak ? "POC Break" : "Momentum Stack";
+        freshAlerts.push({
+          symbol: coin.symbol,
+          phase: coin.phase.label,
+          score: `${coin.activeScore}`,
+          className: coin.phase.className,
+          kind,
+          timestamp: new Date(now).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          reason: buildWhy(coin)
+        });
+      });
+      state.recentAlerts = freshAlerts;
+      renderAlertFeed();
+
+      if (!state.alertsEnabled || !("Notification" in window) || Notification.permission !== "granted") return;
       data.slice(0, 12).forEach((coin) => {
-        if (!shouldAlert(coin)) return;
+        const pocBreak = coin.pocAcceptance && coin.distFromPOC > 0 && coin.distFromPOC < 2.5;
+        const bestSetup = isBestSetup(coin);
+        if (!shouldAlert(coin) && !pocBreak && !bestSetup) return;
         const existing = state.alerted.get(coin.symbol);
         if (existing && now - existing < 20 * 60 * 1000) return;
         state.alerted.set(coin.symbol, now);
         new Notification(`${coin.symbol} breakout stack`, {
-          body: `${coin.phase.label} | OI ${coin.oiChange >= 0 ? "+" : ""}${coin.oiChange}% | Funding ${formatFunding(coin.fundingRate)} | ${coin.structureLabel}`
+          body: `${bestSetup ? "Best setup" : pocBreak ? "POC break" : coin.phase.label} | OI ${coin.oiChange >= 0 ? "+" : ""}${coin.oiChange}% | Funding ${formatFunding(coin.fundingRate)} | ${coin.structureLabel}`
         });
       });
     }
 
     function getView() {
       let data = [...state.allData];
+      if (state.activeSector !== "all") data = data.filter((coin) => coin.sectorName === state.activeSector);
       if (state.filter === "leaders") data = data.filter((coin) => coin.activeScore >= 62);
       if (state.filter === "decorr") data = data.filter((coin) => coin.corr <= 0.35);
       if (state.filter === "quiet") data = data.filter((coin) => coin.prePumpScore >= 55 && coin.breakoutScore < 62 && coin.exhaustionScore < 60);
@@ -1179,7 +1313,7 @@
       sectorSummary.textContent = `${hottest.name} is leading with ${hottest.avgBtcRel > 0 ? "+" : ""}${hottest.avgBtcRel}% average BTC-relative strength, while ${sympathyTotal} sympathy candidates are sitting across the mapped sectors.`;
 
       sectorGrid.innerHTML = sectors.slice(0, 8).map((sector) => `
-        <article class="sector-card">
+        <article class="sector-card ${state.activeSector === sector.name ? "active" : ""}" data-sector="${sector.name}">
           <div class="sector-top">
             <div>
               <div class="sector-name">${sector.name}</div>
@@ -1222,6 +1356,16 @@
           </div>
         </article>
       `).join("");
+
+      sectorGrid.querySelectorAll(".sector-card").forEach((card) => {
+        card.addEventListener("click", () => {
+          const sector = card.dataset.sector;
+          state.activeSector = state.activeSector === sector ? "all" : sector;
+          state.page = 0;
+          renderTable();
+          buildSectorDashboard(state.allData);
+        });
+      });
     }
 
     function applySectorSympathy(results) {
@@ -1584,26 +1728,46 @@
     }
 
     async function buildSectorMap() {
+      try {
+        const cached = JSON.parse(localStorage.getItem(SECTOR_CACHE_KEY) || "null");
+        if (cached?.ts && Date.now() - cached.ts < SECTOR_CACHE_TTL && cached.map) {
+          return { ...SECTORS, ...cached.map };
+        }
+      } catch {}
+
       const map = { ...SECTORS };
+      const chunkSize = 3;
 
-      for (const cat of CATEGORIES) {
-        try {
-          const coins = await fetchJson(
-            `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=${cat.id}&per_page=250&page=1&sparkline=false`
-          );
-
-          if (Array.isArray(coins)) {
-            coins.forEach((coin) => {
-              const sym = String(coin.symbol || "").toUpperCase();
-              if (sym && !map[sym]) map[sym] = cat.label;
-            });
+      for (let i = 0; i < CATEGORIES.length; i += chunkSize) {
+        const chunk = CATEGORIES.slice(i, i + chunkSize);
+        const responses = await Promise.all(chunk.map(async (cat) => {
+          try {
+            const coins = await fetchJson(
+              `https://api.coingecko.com/api/v3/coins/markets?vs_currency=usd&category=${cat.id}&per_page=250&page=1&sparkline=false`
+            );
+            return { cat, coins };
+          } catch (error) {
+            console.warn("Category fetch failed:", cat.label, error);
+            return { cat, coins: [] };
           }
+        }));
 
-          await new Promise((resolve) => setTimeout(resolve, 2000));
-        } catch (error) {
-          console.warn("Category fetch failed:", cat.label, error);
+        responses.forEach(({ cat, coins }) => {
+          if (!Array.isArray(coins)) return;
+          coins.forEach((coin) => {
+            const sym = String(coin.symbol || "").toUpperCase();
+            if (sym && !map[sym]) map[sym] = cat.label;
+          });
+        });
+
+        if (i + chunkSize < CATEGORIES.length) {
+          await new Promise((resolve) => setTimeout(resolve, 1200));
         }
       }
+
+      try {
+        localStorage.setItem(SECTOR_CACHE_KEY, JSON.stringify({ ts: Date.now(), map }));
+      } catch {}
 
       return map;
     }
