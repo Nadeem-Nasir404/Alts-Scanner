@@ -849,7 +849,8 @@
       countdownId: null,
       alertsEnabled: false,
       alerted: new Map(),
-      recentAlerts: []
+      recentAlerts: [],
+      sectorMapLoading: false
     };
 
     function isStable(symbol) { return STABLES.has(symbol) || symbol.startsWith("USD") || symbol.endsWith("USD"); }
@@ -1817,20 +1818,30 @@
       return map;
     }
 
+    async function ensureSectorMapLoaded() {
+      if (sectorMapLoaded || state.sectorMapLoading) return;
+      state.sectorMapLoading = true;
+      document.getElementById("sectorSummary").textContent = "Loading expanded CoinGecko sector coverage in the background...";
+      try {
+        SECTOR_MAP = await buildSectorMap();
+        sectorMapLoaded = true;
+        if (state.allData.length) {
+          applySectorSympathy(state.allData);
+          buildSectorDashboard(state.allData);
+          renderTable();
+        }
+      } catch (error) {
+        console.warn("Sector map background load failed.", error);
+        document.getElementById("sectorSummary").textContent = "Using fallback sector map. Expanded CoinGecko sectors are temporarily unavailable.";
+      } finally {
+        state.sectorMapLoading = false;
+      }
+    }
+
     async function fetchAll() {
       const tbody = document.getElementById("tBody");
       const mobileList = document.getElementById("mobileList");
-      if (!sectorMapLoaded) {
-        tbody.innerHTML = `<tr><td colspan="20" class="loading-row">Loading sector data...</td></tr>`;
-        mobileList.innerHTML = `<div class="loading-row">Loading sector data...</div>`;
-        try {
-          SECTOR_MAP = await buildSectorMap();
-        } catch (error) {
-          console.warn("Sector map load failed, using static fallback.", error);
-          SECTOR_MAP = { ...SECTORS };
-        }
-        sectorMapLoaded = true;
-      }
+      if (!sectorMapLoaded && !state.sectorMapLoading) ensureSectorMapLoaded();
 
       tbody.innerHTML = `<tr><td colspan="20" class="loading-row">Scanning market structure...</td></tr>`;
       mobileList.innerHTML = `<div class="loading-row">Scanning market structure...</div>`;
