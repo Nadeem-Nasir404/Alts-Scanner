@@ -805,6 +805,12 @@
     let sectorMapLoaded = false;
     const SECTOR_CACHE_KEY = "altsScannerSectorMapV2";
     const SECTOR_CACHE_TTL = 1000 * 60 * 60 * 12;
+    const SECTOR_OVERRIDES = {
+      TRU: "DeFi",
+      PEOPLE: "Meme",
+      AI: "AI",
+      CREAM: "DeFi"
+    };
 
     const TIMEFRAME_CONFIG = {
       prepump: [
@@ -881,6 +887,16 @@
       return round(num / Math.sqrt(da * db), 3);
     }
 
+    function blendedCorrelation(a, b) {
+      const shared = Math.min(a.length, b.length);
+      if (shared < 20) return pearson(a, b);
+      const shortWindow = Math.min(30, shared);
+      const mediumWindow = Math.min(100, shared);
+      const shortCorr = pearson(a.slice(-shortWindow), b.slice(-shortWindow));
+      const mediumCorr = pearson(a.slice(-mediumWindow), b.slice(-mediumWindow));
+      return round(shortCorr * 0.4 + mediumCorr * 0.6, 3);
+    }
+
     function calcRSI(closes, period = 14) {
       if (closes.length < period + 1) return 50;
       let gains = 0;
@@ -934,6 +950,21 @@
         if (closes[i] >= opens[i]) greenVol += vol;
       }
       return total === 0 ? 0.5 : round(greenVol / total, 2);
+    }
+
+    function detectLiquiditySweep(opens, highs, lows, closes) {
+      if (closes.length < 3) return "NONE";
+      const idx = closes.length - 1;
+      const open = opens[idx];
+      const high = highs[idx];
+      const low = lows[idx];
+      const close = closes[idx];
+      const upperWick = high - Math.max(open, close);
+      const lowerWick = Math.min(open, close) - low;
+      const body = Math.max(Math.abs(close - open), 0.0000001);
+      if (lowerWick > body * 2 && close > (high + low) / 2) return "BULLISH";
+      if (upperWick > body * 2 && close < (high + low) / 2) return "BEARISH";
+      return "NONE";
     }
 
     function distFromHigh(closes) {
@@ -1125,8 +1156,10 @@
       else if (coin.pocAcceptance) notes.push(`holding above POC`);
       else if (Math.abs(coin.distFromPOC) <= 0.5) notes.push(`sitting at POC`);
       if (coin.oiChange >= 3) notes.push(`OI +${coin.oiChange}%`);
+      if (coin.oiAcceleration > 0) notes.push(`OI accelerating`);
       if (Math.abs(coin.fundingRate) >= 0.01) notes.push(`funding ${formatFunding(coin.fundingRate)}`);
       if (coin.cvdDelta > 0) notes.push(`buyers aggressive on taker flow`);
+      if (coin.liquiditySweep === "BULLISH") notes.push(`bullish liquidity sweep`);
       if (coin.longShortRatio > 1.2) notes.push(`crowd leaning long ${coin.longShortRatio}`);
       if (coin.btcRel >= 0) notes.push(`outperforming BTC by ${coin.btcRel}%`);
       if (coin.volRatio >= 1.35) notes.push(`volume x${coin.volRatio}`);
@@ -1372,7 +1405,7 @@
       const pumpedSectors = new Set();
       const sectorBuckets = new Map();
       results.forEach((coin) => {
-        coin.sectorName = SECTOR_MAP[coin.symbol] || SECTORS[coin.symbol] || "Other";
+        coin.sectorName = SECTOR_OVERRIDES[coin.symbol] || SECTORS[coin.symbol] || SECTOR_MAP[coin.symbol] || "Other";
         coin.sympathyAlert = false;
         coin.sectorRS = 0;
         if (coin.sectorName !== "Other" && coin.btcRel > 5 && coin.volRatio > 2) pumpedSectors.add(coin.sectorName);
@@ -1587,7 +1620,7 @@
           key: config.key,
           interval: config.interval,
           weight: config.weight,
-          corr: pearson(btcReturns, pctReturns(closes)),
+          corr: blendedCorrelation(btcReturns, pctReturns(closes)),
           rsi: calcRSI(closes),
           volTrend: volumeTrend(volumes),
           buyPressure: buyPressure(closes, opens, volumes),
@@ -1602,7 +1635,8 @@
           structureClass: profile.structureClass,
           structureRank: profile.structureRank,
           trend: structureScore(closes),
-          momentum: momentumBurst(closes, volumes)
+          momentum: momentumBurst(closes, volumes),
+          liquiditySweep: detectLiquiditySweep(opens, highs, lows, closes)
         };
       });
 
@@ -1633,14 +1667,17 @@
         structureRank: frames.at(-1).structureRank,
         fundingRate: 0,
         fundingScore: 0,
+        futuresAvailable: false,
         latestOi: 0,
         openInterest: 0,
         oiChangePct: 0,
         oiChange: 0,
         oiRising: false,
         oiScore: 0,
+        oiAcceleration: 0,
         longShortRatio: 1,
         cvdDelta: 0,
+        liquiditySweep: frames[0].liquiditySweep,
         fundingDanger: false,
         fundingNegative: false,
         smartAccumulation: false
@@ -1691,11 +1728,11 @@
     async function fetchDerivativesData(symbol) {
       const sym = symbol.endsWith("USDT") ? symbol : `${symbol}USDT`;
 
-      const [oi, funding, lsRatio, takerRatio] = await Promise.all([
+      const [oi, funding, lsRatio, perpKlines] = await Promise.all([
         fetchJson(`https://fapi.binance.com/fapi/v1/openInterest?symbol=${sym}`),
         fetchJson(`https://fapi.binance.com/fapi/v1/premiumIndex?symbol=${sym}`),
         fetchJson(`https://fapi.binance.com/futures/data/globalLongShortAccountRatio?symbol=${sym}&period=1h&limit=3`),
-        fetchJson(`https://fapi.binance.com/futures/data/takerlongshortRatio?symbol=${sym}&period=1h&limit=5`)
+        fetchJson(`https://fapi.binance.com/fapi/v1/klines?symbol=${sym}&interval=1h&limit=30`)
       ]);
 
       const oiHist = await fetchJson(`https://fapi.binance.com/futures/data/openInterestHist?symbol=${sym}&period=1h&limit=5`);
@@ -1704,11 +1741,18 @@
       const oiPrev = Array.isArray(oiHist) && oiHist.length >= 2 ? parseFloat(oiHist[oiHist.length - 2]?.sumOpenInterest || oiNow) : oiNow;
       const oiChangePct = oiPrev > 0 ? parseFloat((((oiNow - oiPrev) / oiPrev) * 100).toFixed(2)) : 0;
       const fundingRate = parseFloat(((parseFloat(funding?.lastFundingRate || 0)) * 100).toFixed(3));
+      const oiValues = Array.isArray(oiHist) ? oiHist.map((item) => parseFloat(item.sumOpenInterest || 0)) : [];
+      const oiChange1 = oiValues.length >= 2 ? oiValues.at(-1) - oiValues.at(-2) : 0;
+      const oiChange2 = oiValues.length >= 3 ? oiValues.at(-2) - oiValues.at(-3) : 0;
+      const oiAcceleration = round(oiChange1 - oiChange2, 2);
 
       let cvdDelta = 0;
-      if (Array.isArray(takerRatio)) {
-        takerRatio.forEach((row) => {
-          cvdDelta += parseFloat(row.buyVol || 0) - parseFloat(row.sellVol || 0);
+      if (Array.isArray(perpKlines)) {
+        perpKlines.forEach((kline) => {
+          const totalVol = parseFloat(kline[5] || 0);
+          const takerBuyVol = parseFloat(kline[9] || 0);
+          const takerSellVol = totalVol - takerBuyVol;
+          cvdDelta += takerBuyVol - takerSellVol;
         });
       }
 
@@ -1717,6 +1761,7 @@
         latestOi: round(oiNow, 2),
         oiChangePct,
         oiChange: oiChangePct,
+        oiAcceleration,
         fundingRate,
         longShortRatio: parseFloat(lsRatio?.[0]?.longShortRatio || 1),
         cvdDelta: round(cvdDelta, 2),
@@ -1816,41 +1861,52 @@
               const coin = aggregateCoin(ticker.symbol.replace("USDT", ""), ticker, framePayloads, btcChange);
               try {
                 const futures = await fetchDerivativesData(ticker.symbol);
+                coin.futuresAvailable = true;
                 coin.openInterest = futures.openInterest;
                 coin.latestOi = futures.latestOi;
                 coin.fundingRate = futures.fundingRate;
                 coin.oiChangePct = futures.oiChangePct;
                 coin.oiChange = futures.oiChange;
                 coin.oiRising = futures.oiRising;
+                coin.oiAcceleration = futures.oiAcceleration;
                 coin.longShortRatio = futures.longShortRatio;
                 coin.cvdDelta = futures.cvdDelta;
                 coin.fundingDanger = futures.fundingDanger;
                 coin.fundingNegative = futures.fundingNegative;
                 coin.smartAccumulation = futures.smartAccumulation;
               } catch {
+                coin.futuresAvailable = false;
                 coin.openInterest = 0;
                 coin.latestOi = 0;
                 coin.fundingRate = 0;
                 coin.oiChangePct = 0;
                 coin.oiChange = 0;
                 coin.oiRising = false;
+                coin.oiAcceleration = 0;
                 coin.longShortRatio = 1;
                 coin.cvdDelta = 0;
                 coin.fundingDanger = false;
                 coin.fundingNegative = false;
                 coin.smartAccumulation = false;
               }
-              coin.fundingScore = fundingScore(coin.fundingRate);
-              coin.oiScore = oiScore(coin.oiChange);
-              if (coin.oiRising && coin.change > 0 && coin.fundingRate < 0.01) {
+              coin.fundingScore = coin.futuresAvailable ? fundingScore(coin.fundingRate) : 52;
+              coin.oiScore = coin.futuresAvailable ? oiScore(coin.oiChange) : 52;
+              if (coin.futuresAvailable && coin.oiRising && coin.change > 0 && coin.fundingRate < 0.01) {
                 coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 20, 0, 100));
               }
-              if (coin.fundingRate > 0.08) {
+              if (coin.futuresAvailable && coin.fundingRate > 0.08) {
                 coin.prePumpScore = Math.round(clamp(coin.prePumpScore - 15, 0, 100));
               }
-              if (coin.smartAccumulation) {
+              if (coin.futuresAvailable && coin.smartAccumulation) {
                 coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 8, 0, 100));
                 coin.activeScore = Math.round(clamp(coin.activeScore + 6, 0, 100));
+              }
+              if (coin.futuresAvailable && coin.oiAcceleration > 0) {
+                coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 4, 0, 100));
+              }
+              if (coin.liquiditySweep === "BULLISH") {
+                coin.prePumpScore = Math.round(clamp(coin.prePumpScore + 5, 0, 100));
+                coin.breakoutScore = Math.round(clamp(coin.breakoutScore + 4, 0, 100));
               }
               coin.activeScore = Math.round(clamp(
                 coin.activeScore * 0.86 +
